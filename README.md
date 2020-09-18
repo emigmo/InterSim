@@ -2,15 +2,15 @@
 
 ## Build the Simulator of Traffic Intersection
 
-1. * Traffic Map Build*
+1. *Traffic Map Build*
 ```
 todo
 ```
-2. * Car Control *
+2. *Car Control*
 ```
 todo
 ```
-3. * Traffic Light Control *
+3. *Traffic Light Control*
 ```
 todo
 ```
