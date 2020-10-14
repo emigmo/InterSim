@@ -1,10 +1,13 @@
 # InterSim
 
 ## Build the Simulator of Traffic Intersection
-
-1. *Traffic Map Build*
+0. *Airsim & UE4*
 ```
 todo
+```
+1. *Traffic Map Build*
+```
+import ue4 file (file link)
 ```
 2. *Car Control*
 ```
@@ -14,16 +17,10 @@ todo
 ```
 todo
 ```
-## Incoming Car Flow
-1. 
 
 ## Reinforcement Learning for Intelligence Traffic Light Control
 
 1. *Single Intersection*
 ```
 DQN or other RL Approach
-```
-2. *Multi Intersections*
-```
-Multi Agent Reinforcement Learning (todo)
 ```
