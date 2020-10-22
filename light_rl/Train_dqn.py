@@ -17,7 +17,7 @@ from env import TrafficAgent
 
 device = torch.device("cuda:0")
 # build model
-model = GATmodel(nfeat=48, nhid=32, nclass=16, dropout=0.6, alpha=0, nheads=1)
+model = GATmodel(nfeat=48, nhid=32, nclass=16, dropout=0, alpha=0.2, nheads=1)
 model = model.to(device)
 
 optimizer = optim.Adam(model.parameters(), lr=0.005, weight_decay=5e-4)
