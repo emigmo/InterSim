@@ -134,12 +134,11 @@ class TrafficAgent():
         return state
 
     def step(self, action):
-        if(action[0]==1):
-            self.send_action()
-        
-        next_state = self.get_state()
         reward = self.get_reward(action)
-
+        if(action[0]==1):
+            self.send_action()        
+        next_state = self.get_state()
+        
         return reward, next_state
 
     def __del__(self):
