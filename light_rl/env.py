@@ -24,10 +24,11 @@ class TrafficAgent():
     def get_reward(self, action,add_flag=True):
         ### the main cost value
         fh = open(COST_FILE, 'r') 
-        main_cost = float(fh.read())
+        main_cost =fh.read()
         while(main_cost == ''):
-            main_cost = float(fh.read())
+            main_cost = fh.read()
         fh.close()
+        main_cost = float(main_cost)
 
         ### an additional cost value
         add_cost = 0
