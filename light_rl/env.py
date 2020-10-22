@@ -10,21 +10,22 @@ from utils import *
 
 
 class TrafficAgent():
-    def __init__():
+    def __init__(self):
+        
         self.time0 = 0
         self.eff_main_cost = 2.0
-        self.eff_add_cost = 0.5
+        self.eff_add_cost = 1
         self.period_time = 80.0
         self.ser = serial.Serial("COM7", 19200, timeout=5)
         self.ser.parity = 'E'
         self.embedding = nn.Embedding(2, 24)
         self.light_state = [0, 1]   # init light state
 
-    def get_reward(self, add_flag=False):
+    def get_reward(self, action,add_flag=True):
         ### the main cost value
         fh = open(COST_FILE, 'r') 
-        main_cost = fh.read()
-        while(cost == ''):
+        main_cost = float(fh.read())
+        while(main_cost == ''):
             main_cost = float(fh.read())
         fh.close()
 
@@ -37,9 +38,16 @@ class TrafficAgent():
             v2 = np.concatenate((b,b,a,b,b,b,a,b),axis=0)
             c1 = np.float(np.dot(vel_pos.reshape(1,-1), v1))
             c2 = np.float(np.dot(vel_pos.reshape(1,-1), v2))
-            add_cost = 0.7 * c1 + 0.3 * c2
+            #add_cost = 0.7 * c1 + 0.3 * c2
         ### TODO: add cost
-
+        if((self.light_state==[0,1]).all()):
+            if(action[0]==1):
+                if(c1>4):
+                    add_cost+=100
+        if((self.light_state==[1,0]).all()):
+            if(action[1]==1):
+                if((c2<4)&((time.time()-self.time0)>25)):
+                    add_cost+=100   
         ### compute the total cost value
         total_cost = self.eff_main_cost * main_cost + self.eff_add_cost * add_cost
         reward = np.array(-total_cost).astype(np.float32)
@@ -50,6 +58,8 @@ class TrafficAgent():
         #### get the traffic light info
         fL=open(TRAFFIC_FILE, 'r')
         temp=fL.read()
+        while(temp==''):
+            temp = fL.read()
         light=np.zeros(2)
         light[0]=temp[0]
         light[1]=temp[1]
@@ -88,8 +98,9 @@ class TrafficAgent():
                     temp[i] = temp[i].strip() 
                     temp[i] = temp[i].strip('[]') 
                     temp[i] = temp[i].split(",")
-                vel_pos.append(np.array(temp).astype(np.float32).reshape(1,48))
-            vel_pos = np.array(vel_pos)
+                #vel_pos.append(np.array(temp).astype(np.float32).reshape(1,48))
+                vel_pos.append(np.array(temp).reshape(48))
+            vel_pos = np.array(vel_pos).astype(np.float32)
             if vel_pos.shape==(8,48):
                 fL.close()
                 break
@@ -126,7 +137,7 @@ class TrafficAgent():
             self.send_action()
         
         next_state = self.get_state()
-        reward = self.get_reward()
+        reward = self.get_reward(action)
 
         return reward, next_state
 
