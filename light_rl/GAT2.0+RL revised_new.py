@@ -246,9 +246,6 @@ def train(model, start):
         Node9=torch.from_numpy(Node9)
         state_l=torch.cat((pos_l,Node9),0)      
 
-        #############################################################################
-
-
         replay_memory.append((state, action, reward, state_l))
             
         if len(replay_memory) > model.replay_memory_size:
