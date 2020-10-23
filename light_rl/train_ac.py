@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+from torch.autograd import Variable
 import time
 import random
 
@@ -18,7 +19,7 @@ from env import TrafficAgent
 
 device = torch.device("cuda:0")
 # build model
-model = GATActorCritic(nfeat=48, nhid=32, nclass=16, dropout=0.2, alpha=0.2, nheads=2, num_actions=2)
+model = GATActorCritic(nfeat=48, nhid=84, nclass=16, dropout=0.2, alpha=0.2, nheads=2, num_actions=2)
 model = model.to(device)
 
 if not os.path.exists('GAT+RL/pretrained_model/'):
@@ -47,18 +48,20 @@ max_grad_norm = 20.0
 number_of_iterations = 10000
 while iteration < number_of_iterations:
     training = True
-    episode_length = 0
-
+ 
     while training:
         values = []
         log_probs = []
         rewards = []
         entropies = []
-
-        for step in range(ac_num_steps):  # 120 timestep as one trajectory
-            iteration += 1
-            episode_length += 1
-
+        time1=env.time0
+        flag=0
+        #for step in range(ac_num_steps):  # 120 timestep as one trajectory
+        while(flag<2):
+            iteration += 1           
+            if(time1!=env.time0):
+                flag+=1
+                time1=env.time0
             value, logit = model.forward(state.to(device), edge)       
             prob = F.softmax(logit, dim=1)
             log_prob = F.log_softmax(logit, dim=1)
@@ -70,18 +73,19 @@ while iteration < number_of_iterations:
             action = torch.zeros([model.number_of_actions], dtype=torch.float32)
             action[action_index] = 1
             if torch.cuda.is_available():
-                action = action.cuda()
-            log_prob = log_prob.gather(1, action.long().unsqueeze(0))
-
+                #action = action.cuda()
+                action_index=action_index.cuda()
+            #log_prob = log_prob.gather(1, action.long().unsqueeze(0))
+            log_prob = log_prob.gather(1, action_index.long())
             #  execute action into UE4
             reward, next_state = env.step(action)
             #TODO plot reward value.
 
             state = next_state  # s' --> s
             
-            values.append(value)         # push value 
-            log_probs.append(log_prob)   # push log_prob
-            rewards.append(reward)       # reward
+            values.append(value.cuda())         # push value 
+            log_probs.append(log_prob.cuda())   # push log_prob
+            rewards.append(reward.cuda())       # reward
 
             #####################################
             globals()['ax'].append(iteration)
@@ -122,7 +126,7 @@ while iteration < number_of_iterations:
 
         optimizer.zero_grad()
 
-        (policy_loss + value_loss_coef * value_loss).backward()
+        (policy_loss + value_loss_coef * value_loss).backward(retain_graph=True )
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
 
         optimizer.step()
