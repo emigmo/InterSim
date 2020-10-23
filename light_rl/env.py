@@ -9,6 +9,17 @@ import sys
 from utils import *
 
 
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import time
+import serial
+import os
+import sys
+
+from utils import *
+
+
 class TrafficAgent():
     def __init__(self):
         
@@ -19,6 +30,7 @@ class TrafficAgent():
         self.ser = serial.Serial("COM7", 19200, timeout=5)
         self.ser.parity = 'E'
         self.embedding = nn.Embedding(2, 24)
+        self.embedding2 = nn.Embedding(2, 1) 
         self.light_state = [0, 1]   # init light state
 
     def get_reward(self, action,add_flag=True):
@@ -44,11 +56,11 @@ class TrafficAgent():
         if((self.light_state==[0,1]).all()):
             if(action[0]==1):
                 if(c1>4):
-                    add_cost+=100
+                    add_cost+=20
         if((self.light_state==[1,0]).all()):
             if(action[1]==1):
                 if((c2<4)&((time.time()-self.time0)>25)):
-                    add_cost+=100   
+                    add_cost+=20   
         ### compute the total cost value
         total_cost = self.eff_main_cost * main_cost + self.eff_add_cost * add_cost
         reward = np.array(-total_cost).astype(np.float32)
@@ -99,12 +111,13 @@ class TrafficAgent():
                     temp[i] = temp[i].strip() 
                     temp[i] = temp[i].strip('[]') 
                     temp[i] = temp[i].split(",")
+                    temp[i] = self.embedding2(torch.LongTensor([np.array(temp[i]).astype(np.float32)]))
                 #vel_pos.append(np.array(temp).astype(np.float32).reshape(1,48))
                 vel_pos.append(np.array(temp).reshape(48))
             vel_pos = np.array(vel_pos).astype(np.float32)
             if vel_pos.shape==(8,48):
                 fL.close()
-                break
+                break       
         return vel_pos
 
     def get_light_info(self):
@@ -136,9 +149,9 @@ class TrafficAgent():
     def step(self, action):
         reward = self.get_reward(action)
         if(action[0]==1):
-            self.send_action()        
-        next_state = self.get_state()
-        
+            self.send_action()       
+        next_state = self.get_state()        
+
         return reward, next_state
 
     def __del__(self):
