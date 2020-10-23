@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from layers import GraphAttentionLayer, SpGraphAttentionLayer
+import numpy as np
 import pdb
 
 def weights_init(m):
@@ -84,6 +85,15 @@ class end_layer(nn.Module):
 class GATActorCritic(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads, num_actions=2):
         super(GATActorCritic, self).__init__()
+        self.dropout = dropout
+        self.number_of_actions = 2
+        self.gamma = 0.99
+        self.final_epsilon = 0.0001
+        self.initial_epsilon = 0.001
+        self.number_of_iterations = 10000
+        self.replay_memory_size = 5000
+        self.minibatch_size = 50
+
         self.num_actions = num_actions
         self.feat = GATmodel(nfeat, nhid, nclass, dropout, alpha, nheads)
         self.critic = end_layer(in_channels=nclass, out_channels=1)
@@ -91,6 +101,6 @@ class GATActorCritic(nn.Module):
 
         self.apply(weights_init)  # init weight
         self.train()
-    def forward(self, inputs):
-        x = self.feat(inputs)
+    def forward(self, x, adj):
+        x = self.feat.forward(x, adj).mean(dim=0).unsqueeze(0)#####
         return self.critic(x), self.action(x)
