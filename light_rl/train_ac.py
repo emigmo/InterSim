@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 import time
 import random
 
@@ -12,7 +13,7 @@ import copy
 import pdb
 
 from utils import *
-from gat import GATmodel
+from gat import GATmodel,GATActorCritic
 from env import TrafficAgent
 
 device = torch.device("cuda:0")
@@ -32,8 +33,6 @@ replay_memory = []
 env = TrafficAgent()
 env.sync()
 
-# epsilon_decrements = np.linspace(model.initial_epsilon, model.final_epsilon, model.number_of_iterations)
-# epsilon = model.initial_epsilon
 iteration = 0
 state = env.get_state()
 ax = []                    
@@ -71,8 +70,8 @@ while iteration < number_of_iterations:
             action = torch.zeros([model.number_of_actions], dtype=torch.float32)
             action[action_index] = 1
             if torch.cuda.is_available():
-                _action = action.cuda()
-            log_prob = log_prob.gather(1, _action)
+                action = action.cuda()
+            log_prob = log_prob.gather(1, action.long().unsqueeze(0))
 
             #  execute action into UE4
             reward, next_state = env.step(action)
@@ -83,6 +82,24 @@ while iteration < number_of_iterations:
             values.append(value)         # push value 
             log_probs.append(log_prob)   # push log_prob
             rewards.append(reward)       # reward
+
+            #####################################
+            globals()['ax'].append(iteration)
+            globals()['ay'].append(-reward)
+            plt.clf()
+            plt.plot(ax,ay)
+            plt.pause(0.1)
+            plt.ioff()
+            #####################################
+            if iteration % 500 == 0:
+                torch.save(replay_memory, "GAT+RL/pretrained_model/replay_memory" + str(iteration) + ".pth")
+                torch.save(model, "GAT+RL/pretrained_model/current_model_" + str(iteration) + ".pth")
+                np.savetxt('iteration'+str(iteration)+'.txt',globals()['ax'],fmt='%0.8f')
+                np.savetxt('cost'+str(iteration)+'.txt',globals()['ay'],fmt='%0.8f')           
+                plt.savefig(str(iteration)+".png")
+    
+            print("iteration:", iteration, "light time:", time.time() - env.time0,  "action:",
+                    action_index.cpu().detach().numpy(), "COST:",-reward.numpy() )
 
         R, _ = model(state.to(device), edge)
         policy_loss = 0
