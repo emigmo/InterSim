@@ -61,6 +61,36 @@ class GATmodel(nn.Module):
         # mix=F.softmax(mix,dim=0)
         # return mix
 
+class MLP(nn.Module):
+    def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads):
+        """Dense version of GAT."""
+        super(MLP, self).__init__()
+        self.number_of_actions = 2
+        self.gamma = 0.99
+        self.final_epsilon = 0.0001
+        self.initial_epsilon = 0.001
+        self.number_of_iterations = 10000
+        self.replay_memory_size = 5000
+        self.minibatch_size = 50
+
+        self.fc1=nn.Linear(432,512)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.fc2=nn.Linear(512,256)
+        self.relu2 = nn.ReLU(inplace=True)
+        self.fc3=nn.Linear(256,2)
+        self.relu3 = nn.ReLU(inplace=True)
+        self.apply(weights_init)  # init weight
+    def forward(self, x,adj):
+        x = self.fc1(x.view(432))
+        x = self.relu1(x)
+        x = self.fc2(x)
+        x = self.relu2(x)
+        x = self.fc3(x)
+        x = self.relu3(x)
+        x=F.softmax(x,dim=0)
+        return x 
+
+
 
 class end_layer(nn.Module):
     def __init__(self, in_channels=32, out_channels=1):
@@ -95,12 +125,14 @@ class GATActorCritic(nn.Module):
         self.minibatch_size = 50
 
         self.num_actions = num_actions
-        self.feat = GATmodel(nfeat, nhid, nclass, dropout, alpha, nheads)
+        #self.feat = GATmodel(nfeat, nhid, nclass, dropout, alpha, nheads)
+        self.feat = MLP(nfeat, nhid, nclass, dropout, alpha, nheads)
         self.critic = end_layer(in_channels=nclass, out_channels=1)
         self.action = end_layer(in_channels=nclass, out_channels=num_actions)
 
         self.apply(weights_init)  # init weight
         self.train()
     def forward(self, x, adj):
-        x = self.feat.forward(x, adj).mean(dim=0).unsqueeze(0)#####
+        #x = self.feat.forward(x,adj).mean(dim=0).unsqueeze(0)#######
+        x = self.feat.forward(x).unsqueeze(0)
         return self.critic(x), self.action(x)
