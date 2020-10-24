@@ -9,16 +9,6 @@ import sys
 from utils import *
 
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import time
-import serial
-import os
-import sys
-
-from utils import *
-
 class TrafficAgent():
     def __init__(self):
         
@@ -28,38 +18,40 @@ class TrafficAgent():
         self.period_time = 80.0
         self.ser = serial.Serial("COM7", 19200, timeout=5)
         self.ser.parity = 'E'
-        self.embedding_light = nn.Embedding(2, 24)   # light current state embedding
-        self.embedding_velhicle = nn.Embedding(2, 1)   # vehicle position embedding
-        self.light_state = [0, 1]   # init light state
+        self.embedding = nn.Embedding(2, 24)
+        self.embedding2 = nn.Embedding(2, 1) 
+        self.light_state = np.array([1, 0])   # init light state
 
-    def get_reward(self, action,add_flag=True):
+    def get_reward(self, action,add_flag=False):
         ### the main cost value
+        '''
         fh = open(COST_FILE, 'r') 
         main_cost =fh.read()
         while(main_cost == ''):
             main_cost = fh.read()
         fh.close()
         main_cost = float(main_cost)
+        '''
+        _,vel_pos = self.get_vehicle_position()
+        a, b = np.ones(48), np.zeros(48)
+        v1 = np.concatenate((a,b,b,b,a,b,b,b),axis=0)
+        v2 = np.concatenate((b,b,a,b,b,b,a,b),axis=0)
+        c1 = np.float(np.dot(vel_pos.reshape(1,-1), v1))
+        c2 = np.float(np.dot(vel_pos.reshape(1,-1), v2))
+        main_cost=0.7 * c1 + 0.3 * c2
 
         ### an additional cost value
         add_cost = 0
         if add_flag:
-            vel_pos = self.get_vehicle_position()
-            a, b = np.ones(48), np.zeros(48)
-            v1 = np.concatenate((a,b,b,b,a,b,b,b),axis=0)
-            v2 = np.concatenate((b,b,a,b,b,b,a,b),axis=0)
-            c1 = np.float(np.dot(vel_pos.reshape(1,-1), v1))
-            c2 = np.float(np.dot(vel_pos.reshape(1,-1), v2))
-            #add_cost = 0.7 * c1 + 0.3 * c2
         ### TODO: add cost
-        if((self.light_state==[0,1]).all()):
-            if(action[0]==1):
-                if(c1>4):
-                    add_cost+=20
-        if((self.light_state==[1,0]).all()):
-            if(action[1]==1):
-                if((c2<4)&((time.time()-self.time0)>25)):
-                    add_cost+=20   
+            if((self.light_state==[0,1]).all()):
+                if(action[0]==1):
+                    if(c1>4):
+                        add_cost+=20                        
+            if((self.light_state==[1,0]).all()):
+                if(action[1]==1):
+                    if((c2<4)&((time.time()-self.time0)>25)):
+                        add_cost+=20   
         ### compute the total cost value
         total_cost = self.eff_main_cost * main_cost + self.eff_add_cost * add_cost
         reward = np.array(-total_cost).astype(np.float32)
@@ -98,6 +90,7 @@ class TrafficAgent():
     def get_vehicle_position(self):
         while(True):  
             vel_pos = []
+            ori_pos = []
             for k in list(range(1, 9)):
                 fL = open(os.path.join(VEL_POSTION_DIR, 'log_direction{}.txt'.format(str(k))), 'r')
                 while(True):
@@ -105,19 +98,23 @@ class TrafficAgent():
                     if (np.size(temp)!=0): 
                         break
                 fL.close()
+                ori=temp.copy()
                 l = len(temp)
                 for i in range(l): 
                     temp[i] = temp[i].strip() 
                     temp[i] = temp[i].strip('[]') 
                     temp[i] = temp[i].split(",")
-                    temp[i] = self.embedding_velhicle(torch.LongTensor([np.array(temp[i]).astype(np.float32)]))
+                    ori[i] = temp[i]
+                    temp[i] = self.embedding2(torch.LongTensor([np.array(temp[i]).astype(np.float32)]))
                 #vel_pos.append(np.array(temp).astype(np.float32).reshape(1,48))
                 vel_pos.append(np.array(temp).reshape(48))
+                ori_pos.append(np.array(ori).reshape(48))
             vel_pos = np.array(vel_pos).astype(np.float32)
-            if vel_pos.shape==(8, 48):
+            ori_pos = np.array(ori_pos).astype(np.float32)
+            if vel_pos.shape==(8,48):
                 fL.close()
                 break       
-        return vel_pos
+        return vel_pos,ori_pos
 
     def get_light_info(self):
         light = self.traffic_light()
@@ -126,8 +123,8 @@ class TrafficAgent():
             self.light_state = light
         light = self.light_state[0]
 
-        N9FirstHalf = self.embedding_light(torch.LongTensor([light]))  # light = 0 or 1
-        longOflight = time.time() - self.time0  # 0 ~ 60
+        N9FirstHalf = self.embedding(torch.LongTensor([light]))  # light = 0 or 1
+        longOflight = time.time() - self.time0
         N9SecondHalf = torch.FloatTensor(np.ones([1, 24]) * longOflight / self.period_time)
 
         Node9_feat = torch.cat((N9FirstHalf, N9SecondHalf), dim=1)
@@ -140,7 +137,7 @@ class TrafficAgent():
         time.sleep(0.2)
 
     def get_state(self):
-        vel_pos = self.get_vehicle_position()
+        vel_pos,_ = self.get_vehicle_position()
         light_info = self.get_light_info()
         state = torch.cat((torch.FloatTensor(vel_pos), light_info), dim=0)
         return state
