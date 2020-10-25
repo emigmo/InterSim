@@ -56,10 +56,10 @@ class GATmodel(nn.Module):
         x = F.dropout(x, self.dropout, training=self.training)
         x = F.elu(self.out_att(x, adj))
 
-        return x 
-        # mix=self.mix_mlp(x.mean(dim=0))
-        # mix=F.softmax(mix,dim=0)
-        # return mix
+        #return x 
+        mix=self.mix_mlp(x.mean(dim=0))
+        mix=F.softmax(mix,dim=0)
+        return mix
 
 class MLP(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads):
@@ -125,14 +125,14 @@ class GATActorCritic(nn.Module):
         self.minibatch_size = 50
 
         self.num_actions = num_actions
-        #self.feat = GATmodel(nfeat, nhid, nclass, dropout, alpha, nheads)
-        self.feat = MLP(nfeat, nhid, nclass, dropout, alpha, nheads)
+        self.feat = GATmodel(nfeat, nhid, nclass, dropout, alpha, nheads)
+        #self.feat = MLP(nfeat, nhid, nclass, dropout, alpha, nheads)
         self.critic = end_layer(in_channels=nclass, out_channels=1)
         self.action = end_layer(in_channels=nclass, out_channels=num_actions)
 
         self.apply(weights_init)  # init weight
         self.train()
     def forward(self, x, adj):
-        #x = self.feat.forward(x,adj).mean(dim=0).unsqueeze(0)#######
-        x = self.feat.forward(x).unsqueeze(0)
+        x = self.feat.forward(x,adj).mean(dim=0).unsqueeze(0)#######
+        #x = self.feat.forward(x).unsqueeze(0)
         return self.critic(x), self.action(x)
