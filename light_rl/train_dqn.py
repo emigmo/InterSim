@@ -12,18 +12,19 @@ import copy
 import pdb
 
 from utils import *
-from gat import GATmodel
+from gat import GATmodel,MLP
 from env import TrafficAgent
 
 device = torch.device("cuda:0")
 # build model
-model = GATmodel(nfeat=48, nhid=32, nclass=16, dropout=0.2, alpha=0.2, nheads=2)
+model = GATmodel(nfeat=48, nhid=84, nclass=16, dropout=0.1, alpha=0.2, nheads=1)#84
+#model = MLP(nfeat=48, nhid=84, nclass=16, dropout=0.1, alpha=0.2, nheads=1)
 model = model.to(device)
 
 if not os.path.exists('GAT+RL/pretrained_model/'):
     os.mkdir('GAT+RL/pretrained_model/')
 
-optimizer = optim.Adam(model.parameters(), lr=0.005, weight_decay=5e-4)
+optimizer = optim.Adam(model.parameters(), lr=3e-4, weight_decay=5e-4)#3e-4
 criterion = nn.MSELoss().cuda()
 AdjacentMatrix=torch.Tensor(ADJ_matrix)
 edge = AdjacentMatrix.to(device) 
@@ -39,6 +40,7 @@ iteration = 0
 state = env.get_state()
 ax = []                    
 ay = []
+reward=torch.Tensor(0)#for display
 while iteration < model.number_of_iterations:
     output = model.forward(state.to(device), edge)       
     # generate the action [light change or not]
@@ -53,6 +55,10 @@ while iteration < model.number_of_iterations:
     action[action_index] = 1
 
     #  execute action into UE4
+
+    print("iteration:", iteration, "light time:", time.time() - env.time0,  "action:",
+        action_index.cpu().detach().numpy(), "COST:",-reward.numpy() )
+
     reward, next_state = env.step(action)
     epsilon = epsilon_decrements[iteration]
 
@@ -89,11 +95,19 @@ while iteration < model.number_of_iterations:
     iteration += 1
     state = next_state
 
-    if iteration % 1000 == 0:
-        torch.save(replay_memory, "GAT+RL/pretrained_model/replay_memory" + str(iteration) + ".pth")
-        torch.save(model, "GAT+RL/pretrained_model/current_model_" + str(iteration) + ".pth")
+    if iteration % 100 == 0:
+        torch.save(model.state_dict(), "GAT+RL/pretrained_model/current_model_" + str(iteration) + ".pkl")
+
+    if iteration % 200 == 0:
+        for param_group in optimizer.param_groups:
+            param_group["lr"] = param_group["lr"]/10 
+
+    if iteration % 500 == 0:
+        torch.save(replay_memory, "GAT+RL/pretrained_model/replay_memory" + str(iteration) + ".pkl")   
+        #torch.save(model.state_dict(), "GAT+RL/pretrained_model/current_model_" + str(iteration) + "pkl")
         np.savetxt('iteration'+str(iteration)+'.txt',globals()['ax'],fmt='%0.8f')
         np.savetxt('cost'+str(iteration)+'.txt',globals()['ay'],fmt='%0.8f')           
         plt.savefig(str(iteration)+".png")
-    print("iteration:", iteration, "light time:", time.time() - env.time0,  "action:",
-            action_index.cpu().detach().numpy(), "COST:",-reward.numpy() )
+    
+
+    
